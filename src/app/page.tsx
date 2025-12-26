@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import Fireworks from "@/components/Fireworks";
+import Guestbook from "@/components/Guestbook";
 
 export default function Home() {
   return (
@@ -27,6 +28,8 @@ export default function Home() {
           <span className="mr-2 group-hover:-translate-y-1 transition-transform duration-300">📅</span>
           CALENDRIER
         </Link>
+
+        <Guestbook />
       </main>
     </div>
   );
