@@ -30,7 +30,7 @@ export default function Guestbook() {
                     schema: 'public',
                     table: 'guestbook',
                 },
-                (payload) => {
+                (payload: any) => {
                     const newEntry = payload.new as GuestbookEntry;
                     const formattedEntry = {
                         ...newEntry,
@@ -46,7 +46,7 @@ export default function Guestbook() {
                     schema: 'public',
                     table: 'guestbook',
                 },
-                (payload) => {
+                (payload: any) => {
                     setEntries((prev) => prev.filter((entry) => entry.id !== payload.old.id));
                 }
             )

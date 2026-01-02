@@ -14,6 +14,7 @@ export default function Snowfall() {
             animationDelay: `${Math.random() * 5}s`,
             fontSize: `${Math.random() * 13 + 13}px`,
         }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         setSnowflakes(flakes);
     }, []);
 
