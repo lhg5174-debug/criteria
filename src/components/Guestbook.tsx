@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface GuestbookEntry {
     id: string;
     name: string;
     message: string;
     date: string;
+    created_at?: string;
 }
 
 export default function Guestbook() {
@@ -17,29 +19,98 @@ export default function Guestbook() {
 
     useEffect(() => {
         setIsClient(true);
-        const saved = localStorage.getItem("guestbook_entries");
-        if (saved) {
-            setEntries(JSON.parse(saved));
-        }
+        fetchEntries();
+
+        const channel = supabase
+            .channel('guestbook_channel')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'guestbook',
+                },
+                (payload) => {
+                    const newEntry = payload.new as GuestbookEntry;
+                    const formattedEntry = {
+                        ...newEntry,
+                        date: new Date(newEntry.created_at!).toLocaleDateString("ko-KR"),
+                    };
+                    setEntries((prev) => [formattedEntry, ...prev]);
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'DELETE',
+                    schema: 'public',
+                    table: 'guestbook',
+                },
+                (payload) => {
+                    setEntries((prev) => prev.filter((entry) => entry.id !== payload.old.id));
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const fetchEntries = async () => {
+        const { data, error } = await supabase
+            .from('guestbook')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching guestbook:', error);
+        } else if (data) {
+            const formattedData = data.map((entry: any) => ({
+                ...entry,
+                date: new Date(entry.created_at).toLocaleDateString("ko-KR"),
+            }));
+            setEntries(formattedData);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("삭제하겠습니까?")) return;
+
+        const { error } = await supabase
+            .from('guestbook')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting entry:', error);
+            alert('Failed to delete entry.');
+        } else {
+            // Optimistic update (real-time subscription will also catch it, but this feels faster)
+            setEntries((prev) => prev.filter((entry) => entry.id !== id));
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim() || !message.trim()) return;
 
-        const newEntry: GuestbookEntry = {
-            id: Date.now().toString(),
-            name: name.trim(),
-            message: message.trim(),
-            date: new Date().toLocaleDateString("ko-KR"),
-        };
+        const { error } = await supabase
+            .from('guestbook')
+            .insert([
+                {
+                    name: name.trim(),
+                    message: message.trim(),
+                },
+            ]);
 
-        const newEntries = [newEntry, ...entries];
-        setEntries(newEntries);
-        localStorage.setItem("guestbook_entries", JSON.stringify(newEntries));
-
-        setName("");
-        setMessage("");
+        if (error) {
+            console.error('Error submitting entry:', error);
+            alert('Failed to submit entry. Please try again.');
+        } else {
+            setName("");
+            setMessage("");
+        }
     };
 
     if (!isClient) return null;
@@ -80,8 +151,15 @@ export default function Guestbook() {
                     </p>
                 ) : (
                     entries.map((entry) => (
-                        <div key={entry.id} className="bg-white/5 p-3 rounded-lg border border-white/5">
-                            <div className="flex justify-between items-baseline mb-1">
+                        <div key={entry.id} className="bg-white/5 p-3 rounded-lg border border-white/5 group relative">
+                            <button
+                                onClick={() => handleDelete(entry.id)}
+                                className="absolute top-2 right-2 text-white/40 hover:text-white transition-colors opacity-0 group-hover:opacity-100 text-xs"
+                                aria-label="삭제"
+                            >
+                                삭제
+                            </button>
+                            <div className="flex justify-between items-baseline mb-1 pr-6">
                                 <span className="text-white font-medium text-sm">{entry.name}</span>
                                 <span className="text-white/30 text-xs">{entry.date}</span>
                             </div>
