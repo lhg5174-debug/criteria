@@ -77,17 +77,27 @@ export default function Guestbook() {
     const handleDelete = async (id: string) => {
         if (!confirm("삭제하겠습니까?")) return;
 
-        const { error } = await supabase
-            .from('guestbook')
-            .delete()
-            .eq('id', id);
+        try {
+            const response = await fetch('/api/guestbook/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ id }),
+            });
 
-        if (error) {
-            console.error('Error deleting entry:', error);
-            alert('Failed to delete entry.');
-        } else {
-            // Optimistic update (real-time subscription will also catch it, but this feels faster)
-            setEntries((prev) => prev.filter((entry) => entry.id !== id));
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error('Error deleting entry:', data.error);
+                alert('삭제 실패했습니다.');
+            } else {
+                // Optimistic update
+                setEntries((prev) => prev.filter((entry) => entry.id !== id));
+            }
+        } catch (error) {
+            console.error('Delete request failed:', error);
+            alert('삭제 요청 중 오류가 발생했습니다.');
         }
     };
 
